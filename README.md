@@ -5,6 +5,9 @@
  - [gym](https://gym.openai.com/)
  - [nes-py](https://github.com/Kautenja/nes-py)
  - [super mario bros gym environment](https://github.com/Kautenja/gym-super-mario-bros)  
+ - openCV
+ - numpy
+ - pytorch
 
  **Notice**: Please make sure your gym version is 0.15.3, otherwise you will not be able to execute the environment correctly. Using the command below to install gym version 0.15.3  
  ```
