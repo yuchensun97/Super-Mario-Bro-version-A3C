@@ -2,7 +2,6 @@
 This script define the training environment
 """
 import cv2
-import subprocess as sp
 import numpy as np
 from collections import deque
 
