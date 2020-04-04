@@ -1,6 +1,6 @@
 # Super Mario Bro version A3C
  ## Final Project for CIS519  
- Environment@ win10, python 3.6.10
+ Environment@win10, python 3.6.10  
  Make sure you have installed the following package:
  - [gym](https://gym.openai.com/)
  - [nes-py](https://github.com/Kautenja/nes-py)
