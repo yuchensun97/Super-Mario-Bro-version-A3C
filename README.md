@@ -18,7 +18,7 @@
  I highly recommend you using Anaconda to manage an enviroment for this project  
  1. Create an environment. Replace `myenv` with your environment name
     ```
-    conda create --name myenve
+    conda create --name myenv
     ```
  2. Create an enviroment with Python 3.6
     ```
