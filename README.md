@@ -13,4 +13,15 @@
  ```
  pip install Iv gym==v0.15.3
  ```
- You could use a virtual enviroment to help with old version package.
+ You could use a virtual enviroment to help with old version package.  
+ 
+ I highly recommend you using Anaconda to manage an enviroment for this project  
+ 1. Create an environment. Replace `myenv` with your environment name
+    ```
+    conda create --name myenve
+    ```
+ 2. Create an enviroment with Python 3.6
+    ```
+    conda create -n myenv python=3.6
+    ```
+ 3. Install the package listed above
