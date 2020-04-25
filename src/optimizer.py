@@ -1,5 +1,5 @@
 """
-Using Adam as optimizer to to improve training spedd
+Using Adam as optimizer to to improve training speed
 """
 import torch
 

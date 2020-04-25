@@ -33,10 +33,11 @@ def init_weight(layers):
 def preprocess(frame):
     if frame is not None:
         frame = cv2.cvtColor(frame,cv2.COLOR_RGB2GRAY)   # convert to grey scale to improve trainning speed
-        frame = cv2.resize(frame,(128,128))[None,:,:]/255.
+        frame = cv2.resize(frame,(84,84))[None,:,:]/255.
     else:
-        return np.zeros((1,128,128))
+        return np.zeros((1,84,84))
 
+# No Sure wheter I should do this...
 def video(video_frame,state,new_episode_bool):
     """
     Args:
@@ -48,7 +49,7 @@ def video(video_frame,state,new_episode_bool):
 
     if new_episode_bool:
         # clear stacked frames
-        stacked_frame = deque([np.zeros((128,128),dtype=np.int) for i in range(stack_size)],maxlen=4)
+        stacked_frame = deque([np.zeros((84,84),dtype=np.int) for i in range(stack_size)],maxlen=4)
         stacked_frame.append(frame)
         stacked_frame.append(frame)
         stacked_frame.append(frame)
