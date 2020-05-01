@@ -1,7 +1,5 @@
 '''
 This script define the agent we would use to train
-API:
-    #To be Define
 '''
 
 import numpy as np

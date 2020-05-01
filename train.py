@@ -54,6 +54,10 @@ def train(idx, shared_model,optimizer,global_counter):
         rewards = []
         entropies = []
 
+        # reset gradient
+        action_loss = 0
+        critic_loss = 0
+
         # repeat until terminal or max steps reach
         for step in range(num_local_steps):
             step_counter+=1
@@ -63,7 +67,7 @@ def train(idx, shared_model,optimizer,global_counter):
             prob = F.softmax(logits,dim=-1)    # probability of choosing each actions
             log_prob = F.log_softmax(logits,dim=1)
             entropy = -(log_prob * prob).sum(1,keepdim=True)
-            entropy.append(entropy)
+            entropies.append(entropy)
 
             m = Categorical(prob)
             action = m.sample().item()    # choosing actions based on multinomial distribution
@@ -78,7 +82,7 @@ def train(idx, shared_model,optimizer,global_counter):
             
             state = torch.from_numpy(state)
             values.append(value)
-            log_probs.append(log_prob)
+            log_probs.append(log_prob[0,action])
             rewards.append(reward)
 
             if done:
@@ -87,8 +91,33 @@ def train(idx, shared_model,optimizer,global_counter):
         # obtain critic values
         if not done:
             _,R,_,_ = model(state,hx,cx)
+            R = R.detach()
         else:
             R = torch.zeros((1,1),dtype = torch.float)
 
-        # TODO: gradient acsent
-        # TODO: perform asynchronous update
+        # gradient acsent
+        values.append(R)
+        esitimator = torch.zeros(1,1)
+        for i in reversed(range(len(rewards))):
+            R = rewards[i] + discount * R
+            advantage_fc = rewards[i] + discount * values[i+1] - values[i]
+
+            # approximate the actor gradient using Generalized Advantage Estimator
+            esitimator = discount * tau * esitimator + advantage_fc
+            # accumulate gradients wrt the actor
+            action_loss = action_loss + log_probs[i] * esitimator.detach() + beta * entropies[i]
+            # accumulate gradients wrt the critic
+            critic_loss = critic_loss + (R-values[i])**2/2
+
+        # perform asynchronous update
+        optimizer.zero_grad()
+        total_loss = critic_loss - action_loss
+        total_loss.backward()
+
+        # ensure current model and shared model has shared gradients
+        for curr_param, shared_param in zip(model.parameters(),shared_model.parameters()):
+            if shared_param is not None:
+                break
+            shared_param._grad = curr_param.grad
+
+        optimizer.step()
