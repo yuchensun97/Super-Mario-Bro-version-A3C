@@ -17,7 +17,7 @@ import torch.multiprocessing as mp
 # hyper parameters
 from params import *
 from model import A3C
-from utils import Memory,preprocess,video
+from utils import preprocess
 from optimizer import Adam_global
 
 class Reward(Wrapper):
