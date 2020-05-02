@@ -1,8 +1,15 @@
+'''
+This script define the training and testing function
+for each actor-learner thread
+'''
+
+
 import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 import torch.multiprocessing as mp
 from torch.distributions import Categorical
+from collections import deque
 
 from src.agent import Reward,SkipEnv, gym_env
 from src.model import A3C
@@ -38,8 +45,10 @@ def train(idx, shared_model,optimizer,global_counter):
     done = True
 
     step_counter = 0
+    curr_episode = 0
 
     while True:
+        curr_episode += 1
         # sync with the shared model
         model.load_state_dict(shared_model.state_dict())
         if done:
@@ -121,3 +130,54 @@ def train(idx, shared_model,optimizer,global_counter):
             shared_param._grad = curr_param.grad
 
         optimizer.step()
+
+        if curr_episode == int(num_global_step/num_local_steps):
+            print('Training process {} terminated'.format(idx))
+            return 
+
+
+def test(idx,shared_model,global_counter):
+    torch.manual_seed(123+idx)
+    env,num_state,num_action = gym_env(world,stage,version,actions)
+    model = A3C(num_state,num_action)
+    model.eval()
+    state = torch.from_numpy(env.reset())
+    done = True
+    step_counter = 0
+    total_reward = 0
+    acts = deque(maxlen = max_actions)
+
+    while True:
+        step_counter += 1
+
+        if done:
+            model.load_state_dict(shared_model.state_dict())
+
+        with torch.no_grad():
+            if done:
+                hx = torch.zeros((1,256),dtype=torch.float)
+                cx = torch.zeros((1,256),dtype=torch.float)
+            else:
+                hx = hx.detach()
+                cx = cx.detach()
+        
+        action,value,hx,cx = model(state,hx,cx)
+        prob = F.softmax(action,dim=1)
+        action = torch.max(prob).item()
+        state,reward,done,_ = env.step(action)
+        env.render()
+        acts.append(action)
+        total_reward += reward
+
+        if step_counter > num_global_step or acts.count(actions[0]) == acts.maxlen:
+            done = True
+        
+        if done:
+            print('number of step {}, episode reward{}, episode length{}'.format(
+                    global_counter, total_reward, step_counter
+            ))
+            step_counter = 0
+            total_reward = 0
+            acts.clear()
+            state = env.reset()
+        state = torch.from_numpy(state)
