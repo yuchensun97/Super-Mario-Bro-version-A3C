@@ -14,5 +14,5 @@ class Adam_global(torch.optim.Adam):
                 state['exp_avg'] = torch.zeros_like(key.data)
                 state['exp_avg_sq'] = torch.zeros_like(key.data)
                 # share memory
-                state['exp_ave'].share_memory_()
+                state['exp_avg'].share_memory_()
                 state['exp_avg_sq'].share_memory_()

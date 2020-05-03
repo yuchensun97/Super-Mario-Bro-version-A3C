@@ -1,8 +1,6 @@
 """
 This script define the configuration of A3C algorithm
 """
-import torch
-
 stack_size = [84,84,4]    # 4 stacked frames
 
 discount = 0.99

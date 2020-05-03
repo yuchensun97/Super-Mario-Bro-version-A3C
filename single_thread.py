@@ -181,3 +181,18 @@ def test(idx,shared_model,global_counter):
             acts.clear()
             state = env.reset()
         state = torch.from_numpy(state)
+
+# for debugging:
+if __name__ == "__main__":
+    torch.manual_seed(123)
+
+    env,num_state,num_action = gym_env(world,stage,version,actions)    # define environment
+    #env.seed(123+idx)
+
+    shared_model = A3C(num_state,num_action)
+    shared_model.share_memory()
+
+    #optimizer = Adam_global(shared_model.parameters(), lr=Args.lr, betas = Args.betas ,eps = Args.eps, weight_decay = Args.weight_decay)
+    optimizer = Adam_global(shared_model.parameters(), lr=lr, betas = betas ,eps = eps, weight_decay = weight_decay)
+
+    train(0, shared_model, optimizer, 0)

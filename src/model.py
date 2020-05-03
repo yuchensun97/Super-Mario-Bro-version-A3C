@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
 import random
-from utils import init_weight
+from src.utils import init_weight
 
 class A3C(nn.Module):
     def __init__(self, num_state, num_action):

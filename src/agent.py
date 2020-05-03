@@ -15,10 +15,11 @@ import torch
 import torch.multiprocessing as mp
 
 # hyper parameters
-from params import *
-from model import A3C
-from utils import preprocess
-from optimizer import Adam_global
+from src.params import *
+from src.utils import preprocess
+
+# from params import *
+# from utils import preprocess
 
 class Reward(Wrapper):
     def __init__(self,env):
@@ -26,7 +27,7 @@ class Reward(Wrapper):
         Args:
             env -- the gym environment passed in
         """
-        super(Reward).__init__(env)
+        super(Reward,self).__init__(env)
         self.observation_space = Box(low=0,high=255,shape=(1,84,84))    # define observation space
         self.curr_score = 0
 
@@ -43,7 +44,7 @@ class Reward(Wrapper):
                 reward+=50
             else:
                 reward-=50
-        return state, reward,done,info
+        return state, reward/10, done,info
 
     def reset(self):
         """
@@ -82,8 +83,10 @@ class SkipEnv(Wrapper):
         """
         self.skip_frame.clear()
         state = self.env.reset()
-        self.skip_frame.append(state)
-        return state
+        for _ in range(self.skip):
+            self.skip_frame.append(state)
+        state = np.stack(self.skip_frame,axis=0)
+        return state.astype(np.float32)
 
 def gym_env(world,stage,version,actions):
     '''
@@ -99,7 +102,7 @@ def gym_env(world,stage,version,actions):
     num_state: number of SuperMario Space
     num_action : number of action
     '''
-    env = gym_super_mario_bros.make('SuperMarioBros--{}--{}--v{}'.format(world,stage,version))
+    env = gym_super_mario_bros.make('SuperMarioBros-{}-{}-v{}'.format(world,stage,version))
     if actions == 'RIGHT_ONLY':
         act = RIGHT_ONLY
     elif actions == 'SIMPLE_MOVEMENT':
@@ -108,8 +111,13 @@ def gym_env(world,stage,version,actions):
         act = COMPLEX_MOVEMENT
     env = JoypadSpace(env,act)
     env = Reward(env)
+    env.reset()
     env = SkipEnv(env)    # skip frame, default = 4
     num_state = env.observation_space.shape[0]
     num_action = env.action_space.n
 
     return env, num_state, num_action
+
+# for debugging
+if __name__ == "__main__":
+    env,num_state,num_action = gym_env(world,stage,version,actions)

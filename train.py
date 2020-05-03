@@ -23,7 +23,7 @@ from single_thread import train, test
 os.environ['OMP_NUM_THREADS'] = '1'
 
 def globalTrain():
-    torch.manual_seed(123+idx)
+    torch.manual_seed(123)
 
     env,num_state,num_action = gym_env(world,stage,version,actions)    # define environment
     #env.seed(123+idx)
@@ -47,8 +47,5 @@ def globalTrain():
     for process in processes:
         process.join()
 
-
-
-
-    
-
+if __name__ == "__main__":
+    globalTrain()
