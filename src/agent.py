@@ -111,7 +111,6 @@ def gym_env(world,stage,version,actions):
         act = COMPLEX_MOVEMENT
     env = JoypadSpace(env,act)
     env = Reward(env)
-    env.reset()
     env = SkipEnv(env)    # skip frame, default = 4
     num_state = env.observation_space.shape[0]
     num_action = env.action_space.n
