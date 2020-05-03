@@ -1,8 +1,6 @@
 """
-This script define the configuration of A3C algorithm
+This script define the parameters for A3C algorithm
 """
-stack_size = [84,84,4]    # 4 stacked frames
-
 discount = 0.99
 
 # define optimizer parameters
@@ -10,6 +8,8 @@ lr = 0.001    # learning rate
 betas = (0.9,0.999)
 eps = 1e-8
 weight_decay = 0
+
+# gradient ascent
 beta = 0.01    # control the strength of the entropy regularization term
 tau = 1.0    # parameters for the 
 

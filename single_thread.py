@@ -46,6 +46,9 @@ def train(idx, shared_model,optimizer,global_counter):
 
     step_counter = 0
     curr_episode = 0
+    terminated = 0
+    success = 0
+    fail = 0
 
     while True:
         curr_episode += 1
@@ -54,6 +57,7 @@ def train(idx, shared_model,optimizer,global_counter):
         if done:
             hx = torch.zeros((1,256),dtype=torch.float)
             cx = torch.zeros((1,256),dtype=torch.float)
+            terminated += 1
         else:
             hx = hx.detach()
             cx = cx.detach()
@@ -73,7 +77,7 @@ def train(idx, shared_model,optimizer,global_counter):
 
             # perform action according to policy
             logits,value,hx,cx = model(state,hx,cx)
-            prob = F.softmax(logits,dim=-1)    # probability of choosing each actions
+            prob = F.softmax(logits,dim=1)    # probability of choosing each actions
             log_prob = F.log_softmax(logits,dim=1)
             entropy = -(log_prob * prob).sum(1,keepdim=True)
             entropies.append(entropy)
@@ -82,12 +86,17 @@ def train(idx, shared_model,optimizer,global_counter):
             action = m.sample().item()    # choosing actions based on multinomial distribution
 
             # recieve reward and new state
-            state,reward,done,_ = env.step(action)
+            state,reward,done,info = env.step(action)
             global_counter += 1
 
             if done or step_counter >= num_global_step:
                 step_counter = 0
                 state = env.reset()
+                if info['flag_get']:
+                    success += 1
+                else:
+                    fail += 1
+
             
             state = torch.from_numpy(state)
             values.append(value)
@@ -132,7 +141,12 @@ def train(idx, shared_model,optimizer,global_counter):
         optimizer.step()
 
         if curr_episode == int(num_global_step/num_local_steps):
-            print('Training process {} terminated'.format(idx))
+            print('Training process {} terminated, run {} episodes, \n \
+                    with {} success and {} failure'.format(idx,terminated,success,fail))
+
+            # save the final model
+            torch.save(shared_model.state_dict(),'trained_model/Super-Mario-Bros-{}-{}-{}'.\
+                        format(world,stage,version))
             return 
 
 

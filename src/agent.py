@@ -74,7 +74,7 @@ class SkipEnv(Wrapper):
             skip_reward+=reward
             if done:
                 break
-        states = np.stack(self.skip_frame,axis=0)
+        states = np.stack(self.skip_frame,axis=1)
         return states.astype(np.float32),reward,done,info
 
     def reset(self):
@@ -85,7 +85,7 @@ class SkipEnv(Wrapper):
         state = self.env.reset()
         for _ in range(self.skip):
             self.skip_frame.append(state)
-        state = np.stack(self.skip_frame,axis=0)
+        state = np.stack(self.skip_frame,axis=1)
         return state.astype(np.float32)
 
 def gym_env(world,stage,version,actions):
@@ -117,6 +117,6 @@ def gym_env(world,stage,version,actions):
 
     return env, num_state, num_action
 
-# for debugging
-if __name__ == "__main__":
-    env,num_state,num_action = gym_env(world,stage,version,actions)
+# # for debugging
+# if __name__ == "__main__":
+#     env,num_state,num_action = gym_env(world,stage,version,actions)
