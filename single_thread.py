@@ -10,12 +10,18 @@ import torch.nn.functional as F
 import torch.multiprocessing as mp
 from torch.distributions import Categorical
 from collections import deque
+from os import path
 
 from src.agent import Reward,SkipEnv, gym_env
 from src.model import A3C
 from src.optimizer import Adam_global
 from src.params import *
 from src.utils import *
+
+def save_model(model):
+
+    return torch.save(model.state_dict(), path.join(path.dirname(path.abspath(__file__)), 'trained_model.pth'))
+
 
 def train(idx, shared_model,optimizer,global_counter):
     '''
@@ -49,11 +55,15 @@ def train(idx, shared_model,optimizer,global_counter):
     terminated = 0
     success = 0
     fail = 0
+    acts = []
 
     while True:
         curr_episode += 1
         # sync with the shared model
         model.load_state_dict(shared_model.state_dict())
+        if curr_episode % 50 == 0:
+            print('Current episode:{}, terminated:{},\
+                    success:{}, fail:{}'.format(curr_episode,terminated,success,fail))
         if done:
             hx = torch.zeros((1,256),dtype=torch.float)
             cx = torch.zeros((1,256),dtype=torch.float)
@@ -84,6 +94,7 @@ def train(idx, shared_model,optimizer,global_counter):
 
             m = Categorical(prob)
             action = m.sample().item()    # choosing actions based on multinomial distribution
+            acts.append(action)
 
             # recieve reward and new state
             state,reward,done,info = env.step(action)
@@ -112,6 +123,7 @@ def train(idx, shared_model,optimizer,global_counter):
             R = R.detach()
         else:
             R = torch.zeros((1,1),dtype = torch.float)
+            acts = []
 
         # gradient acsent
         values.append(R)
@@ -145,56 +157,56 @@ def train(idx, shared_model,optimizer,global_counter):
                     with {} success and {} failure'.format(idx,terminated,success,fail))
 
             # save the final model
-            torch.save(shared_model.state_dict(),'trained_model/Super-Mario-Bros-{}-{}-{}'.\
-                        format(world,stage,version))
+            save_model(model)
             return 
 
 
-def test(idx,shared_model,global_counter):
-    torch.manual_seed(123+idx)
-    env,num_state,num_action = gym_env(world,stage,version,actions)
-    model = A3C(num_state,num_action)
-    model.eval()
-    state = torch.from_numpy(env.reset())
-    done = True
-    step_counter = 0
-    total_reward = 0
-    acts = deque(maxlen = max_actions)
+# def test(idx,shared_model,global_counter):
+#     torch.manual_seed(123+idx)
+#     env,num_state,num_action = gym_env(world,stage,version,actions)
+#     model = A3C(num_state,num_action)
+#     model.load_state_dict(torch.load(path.join(path.dirname(path.abspath(__file__)),'trained_model.pth'),map_location='cpu'))
+#     model.eval()
+#     state = torch.from_numpy(env.reset())
+#     done = True
+#     step_counter = 0
+#     total_reward = 0
+#     acts = deque(maxlen = max_actions)
 
-    while True:
-        step_counter += 1
+#     while True:
+#         step_counter += 1
 
-        if done:
-            model.load_state_dict(shared_model.state_dict())
+#         if done:
+#             model.load_state_dict(shared_model.state_dict())
 
-        with torch.no_grad():
-            if done:
-                hx = torch.zeros((1,256),dtype=torch.float)
-                cx = torch.zeros((1,256),dtype=torch.float)
-            else:
-                hx = hx.detach()
-                cx = cx.detach()
+#         with torch.no_grad():
+#             if done:
+#                 hx = torch.zeros((1,256),dtype=torch.float)
+#                 cx = torch.zeros((1,256),dtype=torch.float)
+#             else:
+#                 hx = hx.detach()
+#                 cx = cx.detach()
         
-        action,value,hx,cx = model(state,hx,cx)
-        prob = F.softmax(action,dim=1)
-        action = torch.max(prob).item()
-        state,reward,done,_ = env.step(action)
-        env.render()
-        acts.append(action)
-        total_reward += reward
+#         action,value,hx,cx = model(state,hx,cx)
+#         prob = F.softmax(action,dim=1)
+#         action = torch.max(prob).item()
+#         state,reward,done,_ = env.step(action)
+#         env.render()
+#         acts.append(action)
+#         total_reward += reward
 
-        if step_counter > num_global_step or acts.count(actions[0]) == acts.maxlen:
-            done = True
+#         if step_counter > num_global_step or acts.count(actions[0]) == acts.maxlen:
+#             done = True
         
-        if done:
-            print('number of step {}, episode reward{}, episode length{}'.format(
-                    global_counter, total_reward, step_counter
-            ))
-            step_counter = 0
-            total_reward = 0
-            acts.clear()
-            state = env.reset()
-        state = torch.from_numpy(state)
+#         if done:
+#             print('number of step {}, episode reward{}, episode length{}'.format(
+#                     global_counter, total_reward, step_counter
+#             ))
+#             step_counter = 0
+#             total_reward = 0
+#             acts.clear()
+#             state = env.reset()
+#         state = torch.from_numpy(state)
 
 # for debugging:
 if __name__ == "__main__":
