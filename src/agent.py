@@ -37,7 +37,7 @@ class Reward(Wrapper):
         """
         state,reward,done,info = self.env.step(action)    # obtain the 
         state = preprocess(state)
-        reward+=(info['score']-self.curr_score)/50
+        reward+=(info['score']-self.curr_score)/40
         self.curr_score = info['score']
         if done:
             if info['flag_get']:

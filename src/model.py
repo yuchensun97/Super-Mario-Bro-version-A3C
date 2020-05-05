@@ -20,9 +20,9 @@ class A3C(nn.Module):
         self.conv2 = nn.Conv2d(32,32,3,stride=2,padding=1)
         self.conv3 = nn.Conv2d(32,32,3,stride=2,padding=1)
         self.conv4 = nn.Conv2d(32,32,3,stride=2,padding=1)
-        self.lstm = nn.LSTMCell(32*6*6,256)
-        self.actor = nn.Linear(256,num_action)
-        self.critic = nn.Linear(256,1)
+        self.lstm = nn.LSTMCell(32*6*6,512)
+        self.actor = nn.Linear(512,num_action)
+        self.critic = nn.Linear(512,1)
         init_weight([self.conv1,self.conv2,self.conv3,self.conv4,self.lstm,self.actor,self.critic])
 
     def forward(self,x,hx,cx):

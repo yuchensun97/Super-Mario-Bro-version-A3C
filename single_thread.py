@@ -3,11 +3,13 @@ This script define the training and testing function
 for each actor-learner thread
 '''
 
-
+import pickle
 import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 import torch.multiprocessing as mp
+import math
+import timeit
 from torch.distributions import Categorical
 from collections import deque
 from os import path
@@ -23,7 +25,7 @@ def save_model(model):
     return torch.save(model.state_dict(), path.join(path.dirname(path.abspath(__file__)), 'trained_model.pth'))
 
 
-def train(idx, shared_model,optimizer,global_counter):
+def train(idx, shared_model,optimizer,counter,lock):
     '''
     A3C for EACH actor-learner thread
 
@@ -38,6 +40,7 @@ def train(idx, shared_model,optimizer,global_counter):
     '''
     # initialization
     torch.manual_seed(123+idx)
+    start = timeit.default_timer()
 
     env,num_state,num_action = gym_env(world,stage,version,actions)    # define environment
     env.seed(123+idx)
@@ -56,17 +59,32 @@ def train(idx, shared_model,optimizer,global_counter):
     success = 0
     fail = 0
     acts = []
+    record_reward = []
+    record_reward_average = []
+    record_acts = []
 
     while True:
         curr_episode += 1
         # sync with the shared model
         model.load_state_dict(shared_model.state_dict())
+
+        # save data
         if curr_episode % 50 == 0:
+            interval_timer = timeit.default_timer()
             print('Current episode:{}, terminated:{},\
-                    success:{}, fail:{}'.format(curr_episode,terminated,success,fail))
+                    success:{}, fail:{},elasped time:{}'.format(curr_episode,terminated,success,fail,interval_timer-start))
+
+            if curr_episode > 50:
+                with open('record_acts.txt','wb') as fp:
+                    pickle.dump(record_acts,fp)
+                
+                with open('record_reward_average.txt','wb') as fp:
+                    pickle.dump(record_reward_average,fp)
+
+            
         if done:
-            hx = torch.zeros((1,256),dtype=torch.float)
-            cx = torch.zeros((1,256),dtype=torch.float)
+            hx = torch.zeros((1,512),dtype=torch.float)
+            cx = torch.zeros((1,512),dtype=torch.float)
             terminated += 1
         else:
             hx = hx.detach()
@@ -98,21 +116,24 @@ def train(idx, shared_model,optimizer,global_counter):
 
             # recieve reward and new state
             state,reward,done,info = env.step(action)
-            global_counter += 1
+
+            with lock:
+                counter.value += 1
 
             if done or step_counter >= num_global_step:
                 step_counter = 0
                 state = env.reset()
                 if info['flag_get']:
-                    success += 1
+                    success = success + 1
                 else:
-                    fail += 1
+                    fail = fail + 1
 
             
             state = torch.from_numpy(state)
             values.append(value)
             log_probs.append(log_prob[0,action])
             rewards.append(reward)
+            record_reward.append(reward)
 
             if done:
                 break
@@ -123,11 +144,16 @@ def train(idx, shared_model,optimizer,global_counter):
             R = R.detach()
         else:
             R = torch.zeros((1,1),dtype = torch.float)
+            record_acts.append(acts)
+            avg_reward = sum(record_reward)
+            record_reward_average.append(avg_reward)
+
+            record_reward = []
             acts = []
 
         # gradient acsent
         values.append(R)
-        esitimator = torch.zeros(1,1)
+        esitimator = torch.zeros((1,1),dtype=torch.float)
         for i in reversed(range(len(rewards))):
             R = rewards[i] + discount * R
             advantage_fc = rewards[i] + discount * values[i+1] - values[i]
@@ -141,7 +167,8 @@ def train(idx, shared_model,optimizer,global_counter):
 
         # perform asynchronous update
         optimizer.zero_grad()
-        total_loss = critic_loss - action_loss
+        total_loss = critic_loss_coef * critic_loss - action_loss
+        nn.utils.clip_grad_norm_(model.parameters(),max_grad_norm)
         total_loss.backward()
 
         # ensure current model and shared model has shared gradients
@@ -152,73 +179,12 @@ def train(idx, shared_model,optimizer,global_counter):
 
         optimizer.step()
 
+        if info['flag_get']:
+            save_model(shared_model)
+
         if curr_episode == int(num_global_step/num_local_steps):
+            end = timeit.default_timer()
             print('Training process {} terminated, run {} episodes, \n \
-                    with {} success and {} failure'.format(idx,terminated,success,fail))
+                    with {} success and {} failure,elasped time {}'.format(idx,terminated,success,fail,end-start))
 
-            # save the final model
-            save_model(model)
             return 
-
-
-# def test(idx,shared_model,global_counter):
-#     torch.manual_seed(123+idx)
-#     env,num_state,num_action = gym_env(world,stage,version,actions)
-#     model = A3C(num_state,num_action)
-#     model.load_state_dict(torch.load(path.join(path.dirname(path.abspath(__file__)),'trained_model.pth'),map_location='cpu'))
-#     model.eval()
-#     state = torch.from_numpy(env.reset())
-#     done = True
-#     step_counter = 0
-#     total_reward = 0
-#     acts = deque(maxlen = max_actions)
-
-#     while True:
-#         step_counter += 1
-
-#         if done:
-#             model.load_state_dict(shared_model.state_dict())
-
-#         with torch.no_grad():
-#             if done:
-#                 hx = torch.zeros((1,256),dtype=torch.float)
-#                 cx = torch.zeros((1,256),dtype=torch.float)
-#             else:
-#                 hx = hx.detach()
-#                 cx = cx.detach()
-        
-#         action,value,hx,cx = model(state,hx,cx)
-#         prob = F.softmax(action,dim=1)
-#         action = torch.max(prob).item()
-#         state,reward,done,_ = env.step(action)
-#         env.render()
-#         acts.append(action)
-#         total_reward += reward
-
-#         if step_counter > num_global_step or acts.count(actions[0]) == acts.maxlen:
-#             done = True
-        
-#         if done:
-#             print('number of step {}, episode reward{}, episode length{}'.format(
-#                     global_counter, total_reward, step_counter
-#             ))
-#             step_counter = 0
-#             total_reward = 0
-#             acts.clear()
-#             state = env.reset()
-#         state = torch.from_numpy(state)
-
-# for debugging:
-if __name__ == "__main__":
-    torch.manual_seed(123)
-
-    env,num_state,num_action = gym_env(world,stage,version,actions)    # define environment
-    #env.seed(123+idx)
-
-    shared_model = A3C(num_state,num_action)
-    shared_model.share_memory()
-
-    #optimizer = Adam_global(shared_model.parameters(), lr=Args.lr, betas = Args.betas ,eps = Args.eps, weight_decay = Args.weight_decay)
-    optimizer = Adam_global(shared_model.parameters(), lr=lr, betas = betas ,eps = eps, weight_decay = weight_decay)
-
-    train(0, shared_model, optimizer, 0)

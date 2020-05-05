@@ -4,6 +4,7 @@ for global training
 '''
 
 import os
+import time
 
 import torch
 import torch.nn as nn 
@@ -18,7 +19,7 @@ from src.optimizer import Adam_global
 from src.params import *
 #from src.Args import Args
 from src.utils import *
-from single_thread import train, test
+from single_thread import train
 
 os.environ['OMP_NUM_THREADS'] = '1'
 
@@ -36,14 +37,16 @@ def globalTrain():
 
 
     processes = []
-    global_counter = mp.Value('i', 0)
+    counter = mp.Value('i', 0)
+    lock = mp.Lock()
+
     for index in range(num_processes):
-        process = mp.Process(target=train, args=(index,  shared_model, optimizer, global_counter))
+        process = mp.Process(target=train, args=(index, shared_model, optimizer,counter,lock))
         process.start()
         processes.append(process)
-    process = mp.Process(target=test, args=(num_processes,  shared_model, optimizer, global_counter))
-    process.start()
-    processes.append(process)
+    # process = mp.Process(target=test, args=(num_processes,  shared_model, optimizer, global_counter))
+    # process.start()
+    # processes.append(process)
     for process in processes:
         process.join()
 
