@@ -9,7 +9,7 @@ import time
 import torch
 import torch.nn as nn 
 import torch.nn.functional as F
-import torch.multiprocessing as mp
+import torch.multiprocessing as _mp
 from torch.distributions import Categorical
 from collections import deque
 
@@ -19,12 +19,14 @@ from src.optimizer import Adam_global
 from src.params import *
 #from src.Args import Args
 from src.utils import *
-from single_thread import train
+from single_thread import train,test
 
 os.environ['OMP_NUM_THREADS'] = '1'
 
 def globalTrain():
     torch.manual_seed(123)
+
+    mp = _mp.get_context('spawn')
 
     env,num_state,num_action = gym_env(world,stage,version,actions)    # define environment
     #env.seed(123+idx)
@@ -35,7 +37,6 @@ def globalTrain():
     #optimizer = Adam_global(shared_model.parameters(), lr=Args.lr, betas = Args.betas ,eps = Args.eps, weight_decay = Args.weight_decay)
     optimizer = Adam_global(shared_model.parameters(), lr=lr, betas = betas ,eps = eps, weight_decay = weight_decay)
 
-
     processes = []
     counter = mp.Value('i', 0)
     lock = mp.Lock()
@@ -44,9 +45,9 @@ def globalTrain():
         process = mp.Process(target=train, args=(index, shared_model, optimizer,counter,lock))
         process.start()
         processes.append(process)
-    # process = mp.Process(target=test, args=(num_processes,  shared_model, optimizer, global_counter))
-    # process.start()
-    # processes.append(process)
+    process = mp.Process(target=test, args=(num_processes, shared_model))
+    process.start()
+    processes.append(process)
     for process in processes:
         process.join()
 

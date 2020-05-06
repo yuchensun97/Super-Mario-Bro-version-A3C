@@ -24,5 +24,5 @@ actions = 'SIMPLE_MOVEMENT'
 # training process
 num_local_steps = 50
 num_global_step = 3e6
-num_processes = 2
+num_processes = 4
 max_actions = 200    # maximum number of actions in an episode

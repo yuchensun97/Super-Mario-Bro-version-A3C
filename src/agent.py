@@ -22,6 +22,12 @@ from src.utils import preprocess
 # from utils import preprocess
 
 class Reward(Wrapper):
+    '''
+    design the reward function
+    reference 
+    @ https://github.com/Kautenja/gym-super-mario-bros/blob/master/gym_super_mario_bros/smb_env.py
+
+    '''
     def __init__(self,env):
         """
         Args:
@@ -30,6 +36,9 @@ class Reward(Wrapper):
         super(Reward,self).__init__(env)
         self.observation_space = Box(low=0,high=255,shape=(1,84,84))    # define observation space
         self.curr_score = 0
+        self.curr_time = 400    # initial time left
+        self.curr_x = 40        # initial distance
+        self.curr_stat = 0     # mario is small, 0
 
     def step(self,action):
         """
@@ -37,8 +46,20 @@ class Reward(Wrapper):
         """
         state,reward,done,info = self.env.step(action)    # obtain the 
         state = preprocess(state)
-        reward+=(info['score']-self.curr_score)/40
+
+        # distance reward
+        reward = min(max((info['x_pos']-self.curr_x),0),2)
+        self.curr_x = info['x_pos']
+
+        # time reward
+        reward += (info['time']-self.curr_time) * 0.1
+        self.curr_time = info['time']
+
+        # score reward
+        reward+=(info['score']-self.curr_score)* 0.025
         self.curr_score = info['score']
+
+        # total reward
         if done:
             if info['flag_get']:
                 reward+=50

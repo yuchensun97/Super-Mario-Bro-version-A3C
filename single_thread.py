@@ -45,7 +45,8 @@ def train(idx, shared_model,optimizer,counter,lock):
     env,num_state,num_action = gym_env(world,stage,version,actions)    # define environment
     env.seed(123+idx)
 
-    model = A3C(num_state,num_action)
+    # model = A3C(num_state,num_action)
+    model = shared_model
 
     model.train()
 
@@ -62,11 +63,12 @@ def train(idx, shared_model,optimizer,counter,lock):
     record_reward = []
     record_reward_average = []
     record_acts = []
+    success_acts = []
 
     while True:
         curr_episode += 1
         # sync with the shared model
-        model.load_state_dict(shared_model.state_dict())
+        # model.load_state_dict(shared_model.state_dict())
 
         # save data
         if curr_episode % 50 == 0:
@@ -74,12 +76,13 @@ def train(idx, shared_model,optimizer,counter,lock):
             print('Current episode:{}, terminated:{},\
                     success:{}, fail:{},elasped time:{}'.format(curr_episode,terminated,success,fail,interval_timer-start))
 
-            if curr_episode > 50:
+            if curr_episode >= 50:
                 with open('record_acts.txt','wb') as fp:
                     pickle.dump(record_acts,fp)
                 
                 with open('record_reward_average.txt','wb') as fp:
                     pickle.dump(record_reward_average,fp)
+                save_model(model)
 
             
         if done:
@@ -148,6 +151,11 @@ def train(idx, shared_model,optimizer,counter,lock):
             avg_reward = sum(record_reward)
             record_reward_average.append(avg_reward)
 
+            if info['flag_get']:
+                success_acts.append(acts)
+                with open('success_acts.txt','wb') as fp:
+                    pickle.dump(success_acts,fp)
+
             record_reward = []
             acts = []
 
@@ -171,15 +179,13 @@ def train(idx, shared_model,optimizer,counter,lock):
         nn.utils.clip_grad_norm_(model.parameters(),max_grad_norm)
         total_loss.backward()
 
-        # ensure current model and shared model has shared gradients
-        for curr_param, shared_param in zip(model.parameters(),shared_model.parameters()):
-            if shared_param is not None:
-                break
-            shared_param._grad = curr_param.grad
-
         optimizer.step()
 
+
         if info['flag_get']:
+            with open('success_acts.txt','wb') as fp:
+                pickle.dump(record_acts,fp)
+
             save_model(shared_model)
 
         if curr_episode == int(num_global_step/num_local_steps):
@@ -188,3 +194,53 @@ def train(idx, shared_model,optimizer,counter,lock):
                     with {} success and {} failure,elasped time {}'.format(idx,terminated,success,fail,end-start))
 
             return 
+
+def test(idx,shared_model):
+    torch.manual_seed(123+idx)
+    env,num_state,num_action = gym_env(world,stage,version,actions)
+    model = A3C(num_state,num_action)
+    # model.load_state_dict(torch.load(path.join(path.dirname(path.abspath(__file__)),'trained_model.pth'),map_location='cpu'))
+    model.eval()
+    state = torch.from_numpy(env.reset())
+    done = True
+    step_counter = 0
+    total_reward = 0
+    acts = deque(maxlen = max_actions)
+
+    while True:
+        step_counter += 1
+        
+        if done:
+            model.load_state_dict(shared_model.state_dict())
+
+        with torch.no_grad():
+            if done:
+                hx = torch.zeros((1,512),dtype=torch.float)
+                cx = torch.zeros((1,512),dtype=torch.float)
+            else:
+                hx = hx.detach()
+                cx = cx.detach()
+        
+            action,value,hx,cx = model(state,hx,cx)
+            prob = F.softmax(action,dim=-1)
+            action = prob.max(1,keepdim=True)[1].numpy()
+            state,reward,done,_ = env.step(int(action))
+            state = torch.from_numpy(state)
+            env.render()
+            acts.append(action)
+            total_reward += reward
+
+        if done:
+            break
+# if __name__ == "__main__":
+#     torch.manual_seed(123)
+
+#     env,num_state,num_action = gym_env(world,stage,version,actions)    # define environment
+#     #env.seed(123+idx)
+
+#     shared_model = A3C(num_state,num_action)
+#     shared_model.share_memory()
+
+#     #optimizer = Adam_global(shared_model.parameters(), lr=Args.lr, betas = Args.betas ,eps = Args.eps, weight_decay = Args.weight_decay)
+#     optimizer = Adam_global(shared_model.parameters(), lr=lr, betas = betas ,eps = eps, weight_decay = weight_decay)
+#     train(0,shared_model,optimizer,0,0)

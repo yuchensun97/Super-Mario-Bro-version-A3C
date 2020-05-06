@@ -7,13 +7,15 @@ from torch.distributions import Categorical
 from collections import deque
 from os import path
 
+import matplotlib.pyplot as plt
+
 from src.agent import Reward,SkipEnv, gym_env
 from src.model import A3C
 from src.optimizer import Adam_global
 from src.params import *
 from src.utils import *
 
-def test_local(idx):
+def test_global(idx):
     torch.manual_seed(123+idx)
     env,num_state,num_action = gym_env(world,stage,version,actions)
     model = A3C(num_state,num_action)
@@ -30,24 +32,24 @@ def test_local(idx):
 
         with torch.no_grad():
             if done:
-                hx = torch.zeros((1,256),dtype=torch.float)
-                cx = torch.zeros((1,256),dtype=torch.float)
+                hx = torch.zeros((1,512),dtype=torch.float)
+                cx = torch.zeros((1,512),dtype=torch.float)
             else:
                 hx = hx.detach()
                 cx = cx.detach()
         
             action,value,hx,cx = model(state,hx,cx)
-            prob = F.softmax(action,dim=1)
-            m = Categorical(prob)
-            action = m.sample().item()
+            prob = F.softmax(action,dim=-1)
+            action = prob.max(1,keepdim=True)[1].numpy()
             state,reward,done,info = env.step(int(action))
             state = torch.from_numpy(state)
             env.render()
             acts.append(action)
             total_reward += reward
 
-            if done:
-                break
+        if done:
+            break
+
 
 def dummy_test(idx):
     torch.manual_seed(123+idx)
@@ -65,6 +67,10 @@ def dummy_test(idx):
     print(max(reward))
     print(max_id)
 
+    plt.plot(reward)
+    plt.ylabel('some numbers')
+    plt.show()
+
     for act in acts_8:
         if done:
             state = env.reset()
@@ -74,4 +80,4 @@ def dummy_test(idx):
 
 if __name__ == "__main__":
     torch.manual_seed(123)
-    dummy_test(0)
+    test_global(0)
